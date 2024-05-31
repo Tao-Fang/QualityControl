@@ -269,36 +269,23 @@ void ITSClusterTask::monitorData(o2::framework::ProcessingContext& ctx)
 
       for (int iStave = 0; iStave < mNStaves[iLayer]; iStave++) {
 
-        if (iLayer < NLayerIB) {
-          float max = -1.;
-          for (int iChip = 0; iChip < mNChipsPerHic[iLayer]; iChip++) {
-            // find the chip with the max occupancy stave by stave
-            if (hAverageClusterOccupancySummaryIB[iLayer]->getNum()->GetBinContent(iChip + 1, iStave + 1) > max) {
-              max = hAverageClusterOccupancySummaryIB[iLayer]->getNum()->GetBinContent(iChip + 1, iStave + 1);
-            }
-            if (hAverageClusterOccupancySummaryIB[iLayer]->getNum()->GetBinContent(iChip + 1, iStave + 1) < 1e-10) {
-              hEmptyLaneFractionGlobal->Fill(0., 1. / mNLanes[0]);
-              hEmptyLaneFractionGlobal->Fill(3., 1. / mNLanes[3]);
-            }
+        float max = -1.;
+        int TotalLayer = 0;
+        for (int i = 0; i < NLayer; i++) { TotalLayer += NLanePerStaveLayer[i] * StavePerLayer[i];}
+
+        for (int iChip = 0; iChip < mNChipsPerHic[iLayer]; iChip++) {
+          // find the chip with the max occupancy stave by stave
+          if (hAverageClusterOccupancySummaryIB[iLayer]->getNum()->GetBinContent(iChip + 1, iStave + 1) > max) {
+            max = hAverageClusterOccupancySummaryIB[iLayer]->getNum()->GetBinContent(iChip + 1, iStave + 1);
           }
-          int ybin = iStave < (mNStaves[iLayer] / 2) ? 7 + iLayer + 1 : 7 - iLayer;
-          int xbin = 12 - mNStaves[iLayer] / 4 + 1 + (iStave % (mNStaves[iLayer] / 2));
-          mGeneralOccupancy->getNum()->SetBinContent(xbin, ybin, max);
-        } else {
-          float max = -1.;
-          for (int iLane = 0; iLane < mNLanePerHic[iLayer] * mNHicPerStave[iLayer]; iLane++) {
-            if (hAverageClusterOccupancySummaryOB[iLayer]->getNum()->GetBinContent(iLane + 1, iStave + 1) > max) {
-              max = hAverageClusterOccupancySummaryOB[iLayer]->getNum()->GetBinContent(iLane + 1, iStave + 1);
-            }
-            if (hAverageClusterOccupancySummaryOB[iLayer]->getNum()->GetBinContent(iLane + 1, iStave + 1) < 1e-10) {
-              hEmptyLaneFractionGlobal->Fill((iLayer < 5 ? 1. : 2.), (1. / mNLanes[iLayer < 5 ? 1 : 2]));
-              hEmptyLaneFractionGlobal->Fill(3., (1. / mNLanes[3]));
-            }
+          if (hAverageClusterOccupancySummaryIB[iLayer]->getNum()->GetBinContent(iChip + 1, iStave + 1) < 1e-10) {
+            hEmptyLaneFractionGlobal->Fill(iLayer, 1. / NLanePerStaveLayer[iLayer]*StavePerLayer[iLayer]);
+            hEmptyLaneFractionGlobal->Fill(8., 1. / TotalLayer);
           }
-          int ybin = iStave < (mNStaves[iLayer] / 2) ? 7 + iLayer + 1 : 7 - iLayer;
-          int xbin = 12 - mNStaves[iLayer] / 4 + 1 + (iStave % (mNStaves[iLayer] / 2));
-          mGeneralOccupancy->getNum()->SetBinContent(xbin, ybin, max);
         }
+        int ybin = iStave < (mNStaves[iLayer] / 2) ? 7 + iLayer + 1 : 7 - iLayer;
+        int xbin = 12 - mNStaves[iLayer] / 4 + 1 + (iStave % (mNStaves[iLayer] / 2));
+        mGeneralOccupancy->getNum()->SetBinContent(xbin, ybin, max);
       }
 
       if (mDoPublishDetailedSummary == 1) {
@@ -402,7 +389,7 @@ void ITSClusterTask::createAllHistos()
   formatAxes(hClusterVsBunchCrossing, "Bunch Crossing ID", "Number of clusters with npix > 2 in ROF", 1, 1.10);
   hClusterVsBunchCrossing->SetStats(0);
 
-  hEmptyLaneFractionGlobal = new TH1F("EmptyLaneFractionGlobal", "Empty Lane Fraction Global", 4, 0, 4);
+  hEmptyLaneFractionGlobal = new TH1F("EmptyLaneFractionGlobal", "Empty Lane Fraction Global", 8, 0, 8);
   hEmptyLaneFractionGlobal->SetTitle("Empty Lane /All Lane ");
   addObject(hEmptyLaneFractionGlobal);
   formatAxes(hEmptyLaneFractionGlobal, "", "Fraction of empty lane", 1, 1.10);
