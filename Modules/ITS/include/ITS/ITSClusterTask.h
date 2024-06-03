@@ -121,23 +121,25 @@ class ITSClusterTask : public TaskInterface
   int nRphiBinsIB = 1;
   int nRphiBinsOB = 1;
   int nZBinsOB = 1;
-  static constexpr int NFlags = 4;
+  static constexpr int NFlags = 8;
 
   const int mOccUpdateFrequency = 100000;
-  const int mNLanes[4] = { 432, 864, 2520, 3816 }; // IB, ML, OL, TOTAL lane
   int mDoPublish1DSummary = 0;
   int mNThreads = 1;
   int nBCbins = 103;
   long int mTimestamp = -1;
   TString xLabel;
-  std::string mLaneStatusFlag[NFlags] = { "IB", "ML", "OL", "Total" };
+  std::string mLaneStatusFlag[NFlags] = { "Layer 0", "Layer 1", "Layer 2", "Layer 3", "Layer 4", "Layer 5", "Layer 6", "Layer 7", "Total" };
   int mDoPublishDetailedSummary = 0;
+
 
   const int mNStaves[NLayer] = { 12, 16, 20, 24, 30, 42, 48 };
   const int mNHicPerStave[NLayer] = { 1, 1, 1, 8, 8, 14, 14 };
   const int mNChipsPerHic[NLayer] = { 9, 9, 9, 14, 14, 14, 14 };
   const int mNLanePerHic[NLayer] = { 3, 3, 3, 2, 2, 2, 2 };
   const int ChipBoundary[NLayer + 1] = { 0, 108, 252, 432, 3120, 6480, 14712, 24120 };
+  const int NLanePerStaveLayer[NLayer] = { 9, 9, 9, 16, 16, 28, 28 };
+  const int StavePerLayer[NLayer] = { 12, 16, 20, 24, 30, 42, 48 };
   const int StaveBoundary[NLayer + 1] = { 0, 12, 28, 48, 72, 102, 144, 192 };
   const float mLength[NLayer] = { 14., 14., 14., 43., 43., 74., 74. };
   const std::string mYlabels[NLayer * 2] = { "L6B(S24#rightarrow47)", "L5B(S21#rightarrow41)", "L4B(S15#rightarrow29)", "L3B(S12#rightarrow23)", "L2B(S10#rightarrow19)", "L1B(S08#rightarrow15)", "L0B(S06#rightarrow11)", "L0T(S00#rightarrow05)", "L1T(S00#rightarrow07)", "L2T(S00#rightarrow09)", "L3T(S00#rightarrow11)", "L4T(S00#rightarrow14)", "L5T(S00#rightarrow20)", "L6T(S00#rightarrow23)" };
