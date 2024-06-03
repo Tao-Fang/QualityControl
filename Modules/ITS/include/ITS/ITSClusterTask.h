@@ -121,7 +121,7 @@ class ITSClusterTask : public TaskInterface
   int nRphiBinsIB = 1;
   int nRphiBinsOB = 1;
   int nZBinsOB = 1;
-  static constexpr int NFlags = 8;
+  static constexpr int NFlags = 9;
 
   const int mOccUpdateFrequency = 100000;
   int mDoPublish1DSummary = 0;
