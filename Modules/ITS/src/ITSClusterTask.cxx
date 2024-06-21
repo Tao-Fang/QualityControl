@@ -272,6 +272,9 @@ void ITSClusterTask::monitorData(o2::framework::ProcessingContext& ctx)
         float max = -1.;
         int TotalLayer = 0;
         for (int i = 0; i < NLayer; i++) { TotalLayer += NLanePerStaveLayer[i] * StavePerLayer[i];}
+        cout << "TotalLayer is: " << TotalLayer << endl;
+        cout << "mNChipsPerHic[iLayer] is: " << mNChipsPerHic[iLayer] << endl;
+
 
         for (int iChip = 0; iChip < mNChipsPerHic[iLayer]; iChip++) {
           // find the chip with the max occupancy stave by stave
