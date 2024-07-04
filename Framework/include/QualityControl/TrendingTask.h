@@ -26,6 +26,7 @@
 #include <TTree.h>
 
 class TAxis;
+class TCanvas;
 
 namespace o2::quality_control::repository
 {
@@ -54,9 +55,6 @@ class TrendingTask : public PostProcessingInterface
   void update(Trigger, framework::ServiceRegistryRef) override;
   void finalize(Trigger, framework::ServiceRegistryRef) override;
 
-  static void setUserAxisLabel(TAxis* xAxis, TAxis* yAxis, const std::string& graphAxisLabel);
-  static void setUserYAxisRange(TH1* hist, const std::string& graphYAxisRange);
-
  private:
   struct {
     Long64_t runNumber = 0;
@@ -66,14 +64,22 @@ class TrendingTask : public PostProcessingInterface
     }
   } mMetaData;
 
+  static void setUserAxesLabels(TAxis* xAxis, TAxis* yAxis, const std::string& graphAxesLabels);
+  static void setUserYAxisRange(TH1* hist, const std::string& graphYAxisRange);
+  static void formatTimeXAxis(TH1* background);
+  static void formatRunNumberXAxis(TH1* background);
+  static std::string deduceGraphLegendOptions(const TrendingTaskConfig::Graph& graphConfig);
+
   void trendValues(const Trigger& t, repository::DatabaseInterface&);
   void generatePlots();
+  TCanvas* drawPlot(const TrendingTaskConfig::Plot& plotConfig);
+  void initializeTrend(repository::DatabaseInterface& qcdb);
   bool canContinueTrend(TTree* tree);
 
   TrendingTaskConfig mConfig;
   UInt_t mTime;
   std::unique_ptr<TTree> mTrend;
-  std::map<std::string, TObject*> mPlots;
+  std::map<std::string, std::unique_ptr<TObject>> mPlots;
   std::unordered_map<std::string, std::unique_ptr<Reductor>> mReductors;
 };
 

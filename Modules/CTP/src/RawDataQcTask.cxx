@@ -22,14 +22,11 @@
 #include "CTP/RawDataQcTask.h"
 #include "DetectorsRaw/RDHUtils.h"
 #include "Headers/RAWDataHeader.h"
-#include "DPLUtils/DPLRawParser.h"
 #include "DataFormatsCTP/Digits.h"
 #include "DataFormatsCTP/Configuration.h"
 #include "DataFormatsCTP/RunManager.h"
 #include <Framework/InputRecord.h>
-#include <Framework/InputRecordWalker.h>
 #include "Framework/TimingInfo.h"
-#include <DetectorsBase/GRPGeomHelper.h>
 
 namespace o2::quality_control_modules::ctp
 {
@@ -44,19 +41,15 @@ void CTPRawDataReaderTask::initialize(o2::framework::InitContext& /*ctx*/)
   int ninps = o2::ctp::CTP_NINPUTS + 1;
   int nclasses = o2::ctp::CTP_NCLASSES + 1;
   int norbits = o2::constants::lhc::LHCMaxBunches;
-  mHistoInputs = std::make_unique<TH1FRatio>("inputs", "Input Rates; Index ; Rate [kHz]", ninps, 0, ninps, true);
-  mHistoInputs->SetCanExtend(TH1::kAllAxes);
-  mHistoClasses = std::make_unique<TH1FRatio>("classes", "Class Rates; Index; Rate [kHz]", nclasses, 0, nclasses, true);
+  mHistoInputs = std::make_unique<TH1DRatio>("inputs", "Input Rates; Input ; Rate [kHz]", ninps, 0, ninps, true);
+  mHistoClasses = std::make_unique<TH1DRatio>("classes", "Class Rates; Index; Rate [kHz]", nclasses, 0, nclasses, true);
   mHistoInputs->SetStats(0);
   mHistoClasses->SetStats(0);
-  mHistoMTVXBC = std::make_unique<TH1F>("bcMTVX", "BC position of MTVX", norbits, 0, norbits);
-  mHistoInputRatios = std::make_unique<TH1FRatio>("inputRatio", "Input Ratio to MTVX; Index; Ratio;", ninps, 0, ninps, true);
-  mHistoInputRatios->SetCanExtend(TH1::kAllAxes);
-  mHistoClassRatios = std::make_unique<TH1FRatio>("classRatio", "Class Ratio to MB; Index; Ratio", nclasses, 0, nclasses, true);
+  mHistoMTVXBC = std::make_unique<TH1D>("bcMTVX", "BC position of MTVX", norbits, 0, norbits);
+  mHistoInputRatios = std::make_unique<TH1DRatio>("inputRatio", "Input Ratio to MTVX; Input; Ratio;", ninps, 0, ninps, true);
+  mHistoClassRatios = std::make_unique<TH1DRatio>("classRatio", "Class Ratio to MB; Index; Ratio", nclasses, 0, nclasses, true);
   getObjectsManager()->startPublishing(mHistoInputs.get());
-  getObjectsManager()->setDisplayHint(mHistoInputs.get(), "hist");
   getObjectsManager()->startPublishing(mHistoClasses.get());
-  // getObjectsManager()->setDisplayHint(mHistoClasses.get(),"hist");
   getObjectsManager()->startPublishing(mHistoClassRatios.get());
   getObjectsManager()->startPublishing(mHistoInputRatios.get());
   getObjectsManager()->startPublishing(mHistoMTVXBC.get());
@@ -73,18 +66,21 @@ void CTPRawDataReaderTask::startOfActivity(const Activity& activity)
   mHistoClassRatios->Reset();
   mHistoInputRatios->Reset();
   mHistoMTVXBC->Reset();
-  //
+
   mRunNumber = activity.mId;
   mTimestamp = activity.mValidity.getMin();
-  //
-  // mTimestamp = 1714315086649;
-  //
+
   std::string MBclassName = mCustomParameters["MBclassName"];
   if (MBclassName.empty()) {
     MBclassName = "CMTVX-B-NOPF";
   }
   std::string run = std::to_string(mRunNumber);
-  o2::ctp::CTPRunManager::setCCDBHost("https://alice-ccdb.cern.ch");
+  std::string ccdbName = mCustomParameters["ccdbName"];
+  if (ccdbName.empty()) {
+    ccdbName = "https://alice-ccdb.cern.ch";
+  }
+  /// the ccdb reading to be futher discussed
+  o2::ctp::CTPRunManager::setCCDBHost(ccdbName);
   bool ok;
   o2::ctp::CTPConfiguration CTPconfig = o2::ctp::CTPRunManager::getConfigFromCCDB(mTimestamp, run, ok);
   if (ok) {
@@ -113,9 +109,7 @@ void CTPRawDataReaderTask::startOfCycle()
 void CTPRawDataReaderTask::monitorData(o2::framework::ProcessingContext& ctx)
 {
   static constexpr double sOrbitLengthInMS = o2::constants::lhc::LHCOrbitMUS / 1000;
-  // auto nOrbitsPerTF = o2::base::GRPGeomHelper::instance().(getNHBFPerTF); gives 128 ?
   auto nOrbitsPerTF = 32.;
-  // LOG(info) << "============  Starting monitoring ================== ";
   //   get the input
   std::vector<o2::framework::InputSpec> filter;
   std::vector<o2::ctp::LumiInfo> lumiPointsHBF1;
@@ -124,6 +118,7 @@ void CTPRawDataReaderTask::monitorData(o2::framework::ProcessingContext& ctx)
   o2::framework::InputRecord& inputs = ctx.inputs();
   mDecoder.decodeRaw(inputs, filter, outputDigits, lumiPointsHBF1);
 
+  //reading the ctp inputs and ctp classes
   std::string nameInput = "MTVX";
   auto indexTvx = o2::ctp::CTPInputsConfiguration::getInputIndexFromName(nameInput);
   for (auto const digit : outputDigits) {
@@ -131,11 +126,11 @@ void CTPRawDataReaderTask::monitorData(o2::framework::ProcessingContext& ctx)
     if (digit.CTPInputMask.count()) {
       for (int i = 0; i < o2::ctp::CTP_NINPUTS; i++) {
         if (digit.CTPInputMask[i]) {
-          mHistoInputs->getNum()->Fill(ctpinputs[i], 1);
-          mHistoInputRatios->getNum()->Fill(ctpinputs[i], 1);
+          mHistoInputs->getNum()->Fill(i);
+          mHistoInputRatios->getNum()->Fill(i);
           if (i == indexTvx - 1) {
             mHistoMTVXBC->Fill(bcid);
-            mHistoInputRatios->getDen()->Fill(ctpinputs[i], 1);
+            mHistoInputRatios->getDen()->Fill(0., 1);
           }
         }
       }

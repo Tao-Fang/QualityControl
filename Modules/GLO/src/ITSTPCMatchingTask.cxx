@@ -24,15 +24,11 @@
 #include <Framework/InputRecordWalker.h>
 #include <QualityControl/stringUtils.h>
 
-using matchType = o2::globaltracking::MatchITSTPCQC::matchType;
+using matchType = o2::gloqc::MatchITSTPCQC::matchType;
 
 namespace o2::quality_control_modules::glo
 {
 
-ITSTPCMatchingTask::~ITSTPCMatchingTask()
-{
-  //  mMatchITSTPCQC.deleteHistograms();
-}
 void ITSTPCMatchingTask::initialize(o2::framework::InitContext& /*ctx*/)
 {
   ILOG(Debug, Devel) << "initialize ITSTPCMatchingTask" << ENDM; // QcInfoLogger is used. FairMQ logs will go to there as well.
@@ -102,6 +98,29 @@ void ITSTPCMatchingTask::initialize(o2::framework::InitContext& /*ctx*/)
     mMatchITSTPCQC.setEtaCut(atof(param->second.c_str()));
   }
 
+  ///////////////////////////////   Options for K0    ////////////////////////////////
+  if (auto param = mCustomParameters.find("doK0QC"); param != mCustomParameters.end()) {
+    ILOG(Debug, Devel) << "Custom parameter - doK0QC (= do K0 QC): " << param->second << ENDM;
+    mMatchITSTPCQC.setDoK0QC(o2::quality_control::core::decodeBool(param->second));
+  }
+
+  if (auto param = mCustomParameters.find("trackSourcesK0"); param != mCustomParameters.end()) {
+    mMatchITSTPCQC.setTrkSources(o2::dataformats::GlobalTrackID::getSourcesMask(param->second));
+  }
+
+  if (auto param = mCustomParameters.find("maxK0Eta"); param != mCustomParameters.end()) {
+    ILOG(Debug, Devel) << "Custom parameter - maxK0Eta (for K0 selection): " << param->second << ENDM;
+    mMatchITSTPCQC.setMaxK0Eta(atof(param->second.c_str()));
+  }
+  if (auto param = mCustomParameters.find("refitK0"); param != mCustomParameters.end()) {
+    ILOG(Debug, Devel) << "Custom parameter - refitK0 ( enable refit K0s): " << param->second << ENDM;
+    mMatchITSTPCQC.setRefitK0(o2::quality_control::core::decodeBool(param->second));
+  }
+  if (auto param = mCustomParameters.find("cutK0Mass"); param != mCustomParameters.end()) {
+    ILOG(Debug, Devel) << "Custom parameter - cutK0Mass (cut on the distance to the PDG mass): " << param->second << ENDM;
+    mMatchITSTPCQC.setCutK0Mass(atof(param->second.c_str()));
+  }
+
   mMatchITSTPCQC.initDataRequest();
   mMatchITSTPCQC.init();
   mMatchITSTPCQC.publishHistograms(getObjectsManager());
@@ -120,6 +139,8 @@ void ITSTPCMatchingTask::startOfCycle()
 
 void ITSTPCMatchingTask::monitorData(o2::framework::ProcessingContext& ctx)
 {
+
+  ILOG(Debug) << "********** Starting monitoring" << ENDM;
   mMatchITSTPCQC.run(ctx);
 }
 
@@ -130,34 +151,44 @@ void ITSTPCMatchingTask::endOfCycle()
 
   // Sync Mode
   if (common::getFromConfig(mCustomParameters, "isSync", false)) {
-    {
-      // Pt
-      auto hEffPt = mMatchITSTPCQC.getFractionITSTPCmatch(globaltracking::MatchITSTPCQC::ITS);
-      auto hEffPtHist = dynamic_cast<TH1*>(hEffPt->GetPassedHistogram()->Clone("mFractionITSTPCmatch_ITS_Hist"));
-      hEffPtHist->Sumw2();
-      hEffPtHist->Divide(hEffPt->GetTotalHistogram());
-      hEffPtHist->SetBit(TH1::EStatusBits::kNoStats);
-      getObjectsManager()->startPublishing(hEffPtHist);
+    { // Pt
+      auto hEffPt = mMatchITSTPCQC.getFractionITSTPCmatch(gloqc::MatchITSTPCQC::ITS);
+      mHEffPt.reset();
+      mHEffPt.reset(dynamic_cast<TH1*>(hEffPt->GetPassedHistogram()->Clone("mFractionITSTPCmatch_ITS_Hist")));
+      if (mHEffPt) {
+        mHEffPt->Divide(hEffPt->GetPassedHistogram(), hEffPt->GetTotalHistogram(), 1.0, 1.0, "B");
+        mHEffPt->SetBit(TH1::EStatusBits::kNoStats);
+        getObjectsManager()->startPublishing(mHEffPt.get(), PublicationPolicy::Once);
+        getObjectsManager()->setDefaultDrawOptions(mHEffPt->GetName(), "logx");
+      } else {
+        ILOG(Error) << "Failed cast for hEffPtHist, will not publish!" << ENDM;
+      }
     }
 
-    {
-      // Eta
-      auto hEffEta = mMatchITSTPCQC.getFractionITSTPCmatchEta(globaltracking::MatchITSTPCQC::ITS);
-      auto hEffEtaHist = dynamic_cast<TH1*>(hEffEta->GetPassedHistogram()->Clone("mFractionITSTPCmatchEta_ITS_Hist"));
-      hEffEtaHist->Sumw2();
-      hEffEtaHist->Divide(hEffEta->GetTotalHistogram());
-      hEffEtaHist->SetBit(TH1::EStatusBits::kNoStats);
-      getObjectsManager()->startPublishing(hEffEtaHist);
+    { // Eta
+      auto hEffEta = mMatchITSTPCQC.getFractionITSTPCmatchEta(gloqc::MatchITSTPCQC::ITS);
+      mHEffEta.reset();
+      mHEffEta.reset(dynamic_cast<TH1*>(hEffEta->GetPassedHistogram()->Clone("mFractionITSTPCmatchEta_ITS_Hist")));
+      if (mHEffEta) {
+        mHEffEta->Divide(hEffEta->GetPassedHistogram(), hEffEta->GetTotalHistogram(), 1.0, 1.0, "B");
+        mHEffEta->SetBit(TH1::EStatusBits::kNoStats);
+        getObjectsManager()->startPublishing(mHEffEta.get(), PublicationPolicy::Once);
+      } else {
+        ILOG(Error) << "Failed cast for hEffEtaHist, will not publish!" << ENDM;
+      }
     }
 
-    {
-      // Phi
-      auto hEffPhi = mMatchITSTPCQC.getFractionITSTPCmatchPhi(globaltracking::MatchITSTPCQC::ITS);
-      auto hEffPhiHist = dynamic_cast<TH1*>(hEffPhi->GetPassedHistogram()->Clone("mFractionITSTPCmatchPhi_ITS_Hist"));
-      hEffPhiHist->Sumw2();
-      hEffPhiHist->Divide(hEffPhi->GetTotalHistogram());
-      hEffPhiHist->SetBit(TH1::EStatusBits::kNoStats);
-      getObjectsManager()->startPublishing(hEffPhiHist);
+    { // Phi
+      auto hEffPhi = mMatchITSTPCQC.getFractionITSTPCmatchPhi(gloqc::MatchITSTPCQC::ITS);
+      mHEffPhi.reset();
+      mHEffPhi.reset(dynamic_cast<TH1*>(hEffPhi->GetPassedHistogram()->Clone("mFractionITSTPCmatchPhi_ITS_Hist")));
+      if (mHEffPhi) {
+        mHEffPhi->Divide(hEffPhi->GetPassedHistogram(), hEffPhi->GetTotalHistogram(), 1.0, 1.0, "B");
+        mHEffPhi->SetBit(TH1::EStatusBits::kNoStats);
+        getObjectsManager()->startPublishing(mHEffPhi.get(), PublicationPolicy::Once);
+      } else {
+        ILOG(Error) << "Failed cast for hEffPhiHist, will not publish!" << ENDM;
+      }
     }
   }
 }
